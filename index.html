@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#080d18">
+  <meta name="description" content="星环突围：一款包含五波战斗、随机强化与首领战的原创网页街机游戏。">
+  <title>星环突围</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="i18n.js" defer></script>
+  <script src="game.js" defer></script>
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <div class="brand">
+        <button id="home-btn" class="brand-mark" type="button" aria-label="返回主页" title="返回主页" data-en-aria="Home" data-en-title="Home"><i aria-hidden="true"></i></button>
+        <div>
+          <strong data-en="Star Ring Breakout">星环突围</strong>
+          <span data-en="">STAR RING BREAKOUT</span>
+        </div>
+      </div>
+      <div class="top-actions">
+        <button id="settings-btn" class="utility-btn" type="button" aria-label="打开设置" data-en="Settings" data-en-aria="Open settings">设置</button>
+        <button id="pause-btn" class="utility-btn" type="button" disabled data-en="Pause">暂停</button>
+      </div>
+    </header>
+
+    <main id="game-shell">
+      <canvas id="game-canvas" aria-label="星环突围游戏区域" data-en-aria="Star Ring Breakout game area"></canvas>
+      <div class="screen-vignette" aria-hidden="true"></div>
+
+      <section id="hud" class="hud" hidden aria-label="游戏状态" data-en-aria="Game status">
+        <div class="hud-top">
+          <div class="hud-block health-block">
+            <div class="hud-line"><span data-en="Hull Integrity">船体完整度</span><strong id="hp-text">100 / 100</strong></div>
+            <div class="meter hp-meter"><i id="hp-fill"></i></div>
+          </div>
+          <div class="hud-block wave-block">
+            <div class="hud-line"><strong id="wave-label">第 1 波</strong><span id="wave-detail">12 个目标</span></div>
+            <div class="meter wave-meter"><i id="wave-fill"></i></div>
+          </div>
+          <div class="hud-block score-block">
+            <span data-en="Score">当前得分</span>
+            <strong id="score-value">0</strong>
+          </div>
+        </div>
+
+        <div class="xp-row">
+          <span id="level-label">同步等级 1</span>
+          <div class="meter xp-meter"><i id="xp-fill"></i></div>
+          <span id="xp-text">0 / 10</span>
+        </div>
+
+        <div id="buff-bar" class="buff-bar" aria-label="临时强化" data-en-aria="Timed boosts">
+          <span data-buff="shield" hidden><i></i><b data-en="Energy Shield">能量护盾</b><small>6.0</small></span>
+          <span data-buff="double" hidden><i></i><b data-en="Double Fire">双倍火力</b><small>5.0</small></span>
+          <span data-buff="storm" hidden><i></i><b data-en="Bullet Storm">弹幕风暴</b><small>8.0</small></span>
+          <span data-buff="engine" hidden><i></i><b data-en="Overclock Engine">超频引擎</b><small>6.0</small></span>
+          <span data-buff="magnet" hidden><i></i><b data-en="Gravity Core">引力核心</b><small>8.0</small></span>
+          <span data-buff="slow" hidden><i></i><b data-en="Time Dilation">时间滞缓</b><small>5.0</small></span>
+        </div>
+
+        <div id="boss-hud" class="boss-hud" hidden>
+          <div class="hud-line"><strong data-en="Ring Warden">星环监管者</strong><span id="boss-hp-text">1300 / 1300</span></div>
+          <div class="meter boss-meter"><i id="boss-fill"></i></div>
+        </div>
+
+        <div id="combo" class="combo" hidden>
+          <strong id="combo-value">2 连击</strong>
+          <span id="combo-multiplier">得分 ×1.05</span>
+        </div>
+
+        <div id="announcement" class="announcement" hidden>
+          <strong id="announcement-title">第 1 波</strong>
+          <span id="announcement-subtitle">清除所有敌对单位</span>
+        </div>
+
+        <div id="powerup-toast" class="powerup-toast" hidden>能量护盾 · 6 秒</div>
+
+        <div class="dash-panel">
+          <div class="hud-line"><span data-en="Phase Dash">相位冲刺</span><strong id="dash-state">就绪</strong></div>
+          <div class="meter dash-meter"><i id="dash-fill"></i></div>
+          <small data-en="SHIFT / RMB · Ramming hurts both">SHIFT / 右键 · 撞敌双方扣血</small>
+        </div>
+
+        <div class="minimap" aria-label="当前星域小地图" data-en-aria="Sector minimap">
+          <div><span id="minimap-name">星港残骸</span><small>2400 × 1600</small></div>
+          <canvas id="minimap-canvas" width="168" height="112"></canvas>
+        </div>
+      </section>
+
+      <div id="touch-controls" class="touch-controls">
+        <div id="joystick" class="joystick" aria-label="移动摇杆" data-en-aria="Move stick"><i id="joystick-knob"></i></div>
+        <button id="mobile-dash" class="mobile-dash" type="button"><span data-en="Dash">冲刺</span><small id="mobile-dash-time">就绪</small></button>
+      </div>
+
+      <div id="menu-overlay" class="overlay menu-overlay">
+        <section class="panel menu-panel">
+          <div class="menu-emblem" aria-hidden="true"><i></i><b></b></div>
+          <p class="eyebrow">ORIGINAL ARCADE <span>/</span> 05 WAVES</p>
+          <h1><span data-en="Star Ring">星环</span><span data-en="Breakout">突围</span></h1>
+          <p class="tagline" data-en="Fight your way out of the runaway sectors.">在失控星域中，杀出一条回路。</p>
+          <div class="feature-tags"><span data-en="Five Waves">五波进攻</span><span data-en="Random Upgrades">随机强化</span><span data-en="Dynamic Boss">动态首领</span></div>
+
+          <div class="instructions">
+            <div><b>01</b><section><strong data-en="Move">移动</strong><p><kbd>WASD</kbd> <span data-en="/ Arrow Keys">/ 方向键</span></p></section></div>
+            <div><b>02</b><section><strong data-en="Shoot">射击</strong><p data-en="Mouse aim · Hold to fire">鼠标瞄准 · 按住射击</p></section></div>
+            <div><b>03</b><section><strong data-en="Dash">冲刺</strong><p><kbd>SHIFT</kbd> <span data-en="/ RMB">/ 鼠标右键</span></p><small data-en="Phase through bullets · Ramming hurts both">穿越弹幕 · 撞敌双方扣血</small></section></div>
+          </div>
+
+          <p class="menu-map"><span data-en="Current Sector">当前星域</span> <strong id="menu-map-name">星港残骸</strong><span data-en="Pick a map after starting">开始后可以选择地图</span></p>
+          <button id="start-btn" class="primary-btn" type="button"><span data-en="Choose Sector · Break Out">选择星域 · 开始突围</span><kbd>ENTER</kbd></button>
+          <p class="menu-record"><span data-en="High Score">历史最高分</span> <strong id="menu-best-score">0</strong><span> · </span><span data-en="Hold screen to aim &amp; fire">按住屏幕瞄准射击</span></p>
+        </section>
+      </div>
+
+      <div id="map-overlay" class="overlay map-overlay" hidden>
+        <section class="panel map-panel">
+          <p class="eyebrow">SELECT SECTOR</p>
+          <h2 data-en="Choose Sector">选择星域</h2>
+          <p class="panel-subtitle" data-en="Different terrain and hazards — waves and upgrades stay the same">地形与危险机制不同，波次与强化规则一致</p>
+          <div id="map-cards" class="map-cards"></div>
+          <div class="map-actions">
+            <button id="map-back-btn" class="secondary-btn" type="button" data-en="Back">返回</button>
+            <button id="map-start-btn" class="primary-btn" type="button" data-en="Enter Sector">进入星域</button>
+          </div>
+        </section>
+      </div>
+
+      <div id="upgrade-overlay" class="overlay" hidden>
+        <section class="panel upgrade-panel">
+          <p class="eyebrow">ENERGY SYNCHRONIZED</p>
+          <h2 data-en="Choose an Upgrade">选择一项强化</h2>
+          <p class="panel-subtitle" data-en="Combat paused — build your way out">战斗已暂停，构筑你的突围方式</p>
+          <div id="upgrade-cards" class="upgrade-cards"></div>
+        </section>
+      </div>
+
+      <div id="pause-overlay" class="overlay" hidden>
+        <section class="panel compact-panel">
+          <p class="eyebrow">SYSTEM SUSPENDED</p>
+          <h2 data-en="Sector Suspended">星域已暂停</h2>
+          <p class="panel-subtitle" data-en="Take a breath, resume anytime.">稍作整顿，随时继续。</p>
+          <button id="resume-btn" class="primary-btn" type="button" data-en="Resume">继续战斗</button>
+          <button id="pause-menu-btn" class="secondary-btn" type="button" data-en="Main Menu">返回主页</button>
+        </section>
+      </div>
+
+      <div id="settings-overlay" class="overlay settings-overlay" hidden>
+        <section class="panel compact-panel settings-panel" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+          <p class="eyebrow">SYSTEM SETTINGS</p>
+          <h2 id="settings-title" data-en="Settings">设置</h2>
+          <p class="panel-subtitle" data-en="Tune your experience, or read the control and map guide.">调整游戏体验，或查看操作与地图指南。</p>
+          <div class="setting-row">
+            <div><strong data-en="Sound">声音</strong><small data-en="Combat sound effects &amp; cues">战斗音效与提示音</small></div>
+            <button id="settings-sound-toggle" class="sound-switch" type="button" role="switch" aria-checked="true" aria-label="游戏声音" data-en-aria="Game sound"><i aria-hidden="true"></i><span>开启</span></button>
+          </div>
+          <div class="setting-row">
+            <div><strong data-en="Auto-Fire">自动射击</strong><small data-en="Fire continuously toward the crosshair without holding">无需按住左键，朝准星方向持续开火</small></div>
+            <button id="settings-auto-fire-toggle" class="sound-switch" type="button" role="switch" aria-checked="false" aria-label="自动射击" data-en-aria="Auto-fire"><i aria-hidden="true"></i><span>关闭</span></button>
+          </div>
+          <div class="setting-row">
+            <div><strong data-en="Language">语言</strong><small data-en="Interface language">界面显示语言</small></div>
+            <button id="settings-lang-toggle" class="sound-switch" type="button" role="switch" aria-checked="false" aria-label="切换语言" data-en-aria="Toggle language"><i aria-hidden="true"></i><span id="settings-lang-label">中文</span></button>
+          </div>
+          <button id="help-btn" class="settings-help-btn" type="button"><div><strong data-en="Controls &amp; Map Help">操作与地图帮助</strong><small data-en="View controls and map guides">查看操作方法与各地图指南</small></div><span class="row-arrow" aria-hidden="true">›</span></button>
+          <button id="settings-close-btn" class="primary-btn" type="button" data-en="Done">完成</button>
+        </section>
+      </div>
+
+      <div id="help-overlay" class="overlay help-overlay" hidden>
+        <section class="panel help-panel" role="dialog" aria-modal="true" aria-labelledby="help-title">
+          <header class="help-header">
+            <div><p class="eyebrow">FIELD MANUAL</p><h2 id="help-title" data-en="Controls &amp; Map Help">操作与地图帮助</h2></div>
+            <button id="help-close-btn" class="help-close-btn" type="button" aria-label="返回设置" data-en-aria="Back to settings">×</button>
+          </header>
+          <p class="panel-subtitle" data-en="Click an entry to expand or collapse it; each map can be viewed separately.">点击条目展开或收起，各地图可分别查看。</p>
+          <div class="help-content">
+            <details class="help-general">
+              <summary><span><strong data-en="General Controls">总操作帮助</strong><small data-en="Move, shoot, dash, grow, clear">移动、射击、冲刺、成长与通关</small></span></summary>
+              <div class="help-body">
+                <section class="help-section">
+                  <h3 data-en="Basic Controls">基本操作</h3>
+                  <ul class="help-controls">
+                    <li><kbd>WASD</kbd><span><strong data-en="Move">移动</strong><small data-en="Move with WASD or the arrow keys.">使用 WASD 或方向键控制飞船移动。</small></span></li>
+                    <li><kbd data-en="Mouse">鼠标</kbd><span><strong data-en="Aim &amp; Shoot">瞄准与射击</strong><small data-en="Move the mouse to aim, hold the left button to fire.">移动鼠标瞄准，按住鼠标左键持续射击。</small></span></li>
+                    <li><kbd>SHIFT</kbd><span><strong data-en="Phase Dash">相位冲刺</strong><small data-en="Press Shift or right-click to dash. While dashing you pass through enemy bullets; ramming an enemy hurts you both.">按 Shift 或鼠标右键冲刺。冲刺期间可以穿越敌方弹幕；撞到敌人时，双方都会受到伤害。</small></span></li>
+                    <li><kbd>P / ESC</kbd><span><strong data-en="Pause">暂停</strong><small data-en="Pause or resume the game.">暂停或继续游戏。</small></span></li>
+                    <li><kbd data-en="Touch">触屏</kbd><span><strong data-en="Touch Controls">触屏操作</strong><small data-en="Use the left stick to move and the right button to dash. Hold the game area to fire toward your finger, drag to aim, and release to stop.">使用左侧摇杆移动，点击右侧按钮冲刺。按住游戏画面朝触点持续射击，拖动手指调整方向，松手停止。</small></span></li>
+                  </ul>
+                </section>
+                <section class="help-section">
+                  <h3 data-en="Combat &amp; Growth">战斗与成长</h3>
+                  <p data-en="Destroying enemies grants score and drops energy. Collect energy to raise your sync level; each level-up lets you pick one of three upgrades.">击毁敌人可以获得得分，并掉落能量。收集能量提升同步等级，每次升级都可以从三项强化中选择一项。</p>
+                  <p data-en="Chained kills raise your combo score multiplier. The multiplier resets when the combo breaks.">连续击毁敌人可以提高连击得分倍率。连击中断后，倍率会重新计算。</p>
+                  <p data-en="Boost points on the map grant timed boosts. After pickup, the remaining time shows in the boost bar above.">地图中的强化点会提供限时强化。拾取后，剩余时间显示在屏幕上方的强化栏中。</p>
+                  <p data-en="After each normal wave, your hull repairs 20 points, up to the hull maximum.">每清理完一个普通波次，船体会修复 20 点，但不会超过船体完整度上限。</p>
+                </section>
+                <section class="help-section">
+                  <h3 data-en="Pause &amp; Settings">暂停与设置</h3>
+                  <p data-en="The Settings button in the top-right corner lets you toggle sound, auto-fire, language, or open this manual. Opening settings or help during a fight pauses the game.">点击右上角的“设置”按钮，可以开关声音、自动射击、语言或打开本帮助面板。游戏中打开设置或帮助时，战斗会自动暂停。</p>
+                </section>
+                <section class="help-section">
+                  <h3 data-en="Winning">通关目标</h3>
+                  <p data-en="Clear the first four waves to enter the final boss arena.">清除前四波敌人后，将进入最终首领关。</p>
+                  <p data-en="In the final arena, you must destroy the Ring Warden AND every remaining or incoming enemy. Clear all targets to break out.">最终关中，不仅要击毁“星环监管者”，还要消灭所有剩余及待生成的敌人。全部目标清除后即可突围成功。</p>
+                </section>
+              </div>
+            </details>
+
+            <div class="help-map-list" aria-label="地图详细帮助" data-en-aria="Map details">
+              <details class="help-map">
+                <summary><span><strong data-en="Harbor Ruins">星港残骸</strong><small data-en="Static wreckage and cover">静态残骸与掩体</small></span></summary>
+                <div class="help-body">
+                  <h3 data-en="Map Features">地图特点</h3>
+                  <p data-en="Four groups of static wreckage dot the harbor. Wreckage blocks ships, enemies, and bullets; there are no extra map-wide hazards.">星港中分布着四组静态残骸掩体。残骸会阻挡飞船、敌人和弹丸，没有额外的全场危险机制。</p>
+                  <h3 data-en="Tips">应对提示</h3>
+                  <p data-en="Use wreckage to block enemy bullets and keep distance from pursuers.">利用残骸阻挡敌方弹丸，并与追击敌人拉开距离。</p>
+                  <p data-en="Your own bullets are also blocked. Reposition before firing so your shots don't keep hitting cover.">自己的弹丸同样会被残骸阻挡。射击前注意调整位置，避免火力一直落在掩体上。</p>
+                </div>
+              </details>
+
+              <details class="help-map">
+                <summary><span><strong data-en="Rotary Docks">回旋船坞</strong><small data-en="Three rings of rotating round obstacles">三圈旋转圆形障碍</small></span></summary>
+                <div class="help-body">
+                  <h3 data-en="Map Features">地图特点</h3>
+                  <p data-en="Three independent rings of round obstacles rotate around the map center: inner 4, middle 5, outer 6.">三圈独立的圆形障碍物围绕地图中心旋转：内圈 4 个、中圈 5 个、外圈 6 个。</p>
+                  <p data-en="The center stays open. The round obstacles block ships, enemies, and bullets; a boost point also orbits the map.">中心区域保持空旷。圆形障碍物会阻挡飞船、敌人和弹丸，另有一处强化点绕场移动。</p>
+                  <h3 data-en="Tips">应对提示</h3>
+                  <p data-en="Watch the rotation and gaps of the three rings, move through openings, and don't squeeze past an approaching obstacle.">观察三圈障碍物的旋转方向和间隙，顺着空隙转移，不要强行挤向正在接近的圆形障碍。</p>
+                  <p data-en="The open center lets you reposition, re-aim, or wait for the right moment to slip through.">中心区域没有障碍物，可以用来调整位置、重新瞄准或等待合适的穿行时机。</p>
+                </div>
+              </details>
+
+              <details class="help-map">
+                <summary><span><strong data-en="Furnace Core">熔炉核心</strong><small data-en="Map-wide blasts and insulated platforms">全图喷射与隔热平台</small></span></summary>
+                <div class="help-body">
+                  <h3 data-en="Map Features">地图特点</h3>
+                  <p data-en="Six vents activate in turns. Each flashes a 6-second warning before blasting the whole map. Insulated platforms resist the blast.">六个喷口会轮流启动。喷口启动前会进行 6 秒闪烁预警，随后对全图造成喷射伤害。地图中的隔热安全平台可以抵挡全图喷射。</p>
+                  <h3 data-en="Tips">应对提示</h3>
+                  <p data-en="When you see the warning and countdown, get onto an insulated platform before the blast starts.">看到喷口预警和倒计时后，尽快进入隔热安全平台，不要等到喷射开始才转移。</p>
+                  <p data-en="You can fight outside, but watch for the next warning. Platforms only block blast damage — enemy attacks still hurt.">平台外仍可进行战斗，但要留意下一次喷射的预警。平台内只能抵挡喷射伤害，不能免疫敌人的攻击。</p>
+                </div>
+              </details>
+
+              <details class="help-map">
+                <summary><span><strong data-en="Gravity Wells">重力井</strong><small data-en="Gravity pull, bent trajectories, and portals">引力牵引、弹道弯折与传送门</small></span></summary>
+                <div class="help-body">
+                  <h3 data-en="Map Features">地图特点</h3>
+                  <p data-en="Four wells constantly pull nearby ships and enemies and bend bullet paths. Portals link opposite corners for quick travel.">四口引力井会持续牵引附近的飞船和敌人，并改变弹丸的飞行轨迹。地图中的传送门连接对角区域，可以帮助快速转移。</p>
+                  <h3 data-en="Tips">应对提示</h3>
+                  <p data-en="Staying away from wells keeps movement and aim stable; close in, correct your course and aim early.">远离引力井时更容易保持移动和弹道稳定；靠近后，要提前修正移动方向与瞄准位置。</p>
+                  <p data-en="Use the pull to redirect enemy chases, or take a portal to escape an encirclement.">利用引力牵引改变敌人的追击路线，也可以使用传送门迅速脱离包围。</p>
+                </div>
+              </details>
+
+              <details class="help-map">
+                <summary><span><strong data-en="Storm Lane">风暴航道</strong><small data-en="Conveyor belts and sweeping energy walls">传送带与横扫能量墙</small></span></summary>
+                <div class="help-body">
+                  <h3 data-en="Map Features">地图特点</h3>
+                  <p data-en="Belts constantly push ships caught in them, in different directions per zone. Energy walls sweep the map on a schedule — watch for the warning.">传送带会持续推动位于其中的飞船，不同区域的方向不同。能量墙会定期横扫地图，出现预警后应尽早准备应对。</p>
+                  <h3 data-en="Tips">应对提示</h3>
+                  <p data-en="Mind the extra push from belts so you aren't shoved into enemies or hazards.">移动时注意传送带带来的额外推力，避免被推入敌人或危险区域。</p>
+                  <p data-en="Phase dash passes safely through energy walls. Touching them normally hurts and knocks you back.">使用相位冲刺可以安全穿越能量墙。普通接触会受到伤害并被击退。</p>
+                </div>
+              </details>
+
+              <details class="help-map">
+                <summary><span><strong data-en="Neon Matrix">霓虹矩阵</strong><small data-en="Energized rows/columns and safe cells">通电行列与安全格</small></span></summary>
+                <div class="help-body">
+                  <h3 data-en="Map Features">地图特点</h3>
+                  <p data-en="The matrix picks a random row and column, warns briefly, then energizes them. Standing in them hurts. Boosts spawn in safe cells; there is no traditional cover.">矩阵会随机选择一行和一列，经过短暂预警后通电。处于通电区域会受到伤害。强化会在安全格中刷新，地图没有传统掩体。</p>
+                  <h3 data-en="Tips">应对提示</h3>
+                  <p data-en="Watch the row/column warnings and move to safe cells early; avoid the crossing point.">观察行列预警，提前移动到未被选中的安全格，不要停留在交叉位置。</p>
+                  <p data-en="Energized zones hurt enemies too — reposition to lure them in.">通电区域同样会伤害敌人，可以调整位置，引导敌人进入通电行列。</p>
+                </div>
+              </details>
+
+              <details class="help-map help-boss-map">
+                <summary><span><strong data-en="Ring Core">星环之核</strong><small data-en="Final boss, arena laser, and win conditions">最终首领、全图激光与获胜条件</small></span></summary>
+                <div class="help-body">
+                  <h3 data-en="Arena Features">关卡特点</h3>
+                  <p data-en="The final arena. You face the Ring Warden, a steady stream of normal enemies, and pursuers the Warden summons.">这里是最终首领关。需要面对“星环监管者”、陆续生成的普通敌人，以及首领召唤的追击单位。</p>
+                  <p data-en="The arena periodically fires a map-wide laser — an arena mechanic, not the Warden's own shot. It warns while charging; stand inside a golden platform to avoid the damage.">场地会定期触发全图激光。激光属于竞技场机制，并非由首领直接发射。激光充能时会显示预警，站在金色防御平台内可以躲避伤害。</p>
+                  <h3 data-en="Win Conditions">获胜条件</h3>
+                  <p data-en="Destroying the Warden doesn't clear other enemies or end the fight. You must destroy the Warden AND every remaining or incoming enemy to break out.">击毁首领不会自动清除其他敌人，也不会立即获胜。必须击毁首领，并消灭所有剩余及待生成的敌人，才能完成突围。</p>
+                  <h3 data-en="Tips">应对提示</h3>
+                  <p data-en="During the laser warning, get to a golden platform while watching the enemy swarm. After the Warden falls, keep clearing the rest until “SECTOR CLEARED” appears.">激光预警期间优先前往金色防御平台，同时注意敌人的围攻。首领被击毁后，根据目标提示继续清理剩余敌人，直到显示“星域已清理”。</p>
+                </div>
+              </details>
+            </div>
+          </div>
+          <button id="help-back-btn" class="secondary-btn help-back-btn" type="button" data-en="Back to Settings">返回设置</button>
+        </section>
+      </div>
+
+      <div id="result-overlay" class="overlay" hidden>
+        <section class="panel result-panel">
+          <p id="result-eyebrow" class="eyebrow">SIGNAL LOST</p>
+          <h2 id="result-title">突围失败</h2>
+          <p id="result-subtitle" class="panel-subtitle">星环仍在运转，再次挑战。</p>
+          <div class="result-score"><span data-en="Score">本次得分</span><strong id="result-score">0</strong><small id="new-best" hidden data-en="New Record">新纪录</small></div>
+          <div class="result-stats">
+            <div><span data-en="Kills">击毁目标</span><strong id="result-kills">0</strong></div>
+            <div><span data-en="Time">存活时间</span><strong id="result-time">00:00</strong></div>
+            <div><span data-en="Sync Level">同步等级</span><strong id="result-level">1</strong></div>
+          </div>
+          <button id="restart-btn" class="primary-btn" type="button" data-en="Break Out Again">再次突围</button>
+          <button id="menu-btn" class="secondary-btn" type="button" data-en="Main Menu">返回主界面</button>
+        </section>
+      </div>
+    </main>
+
+    <footer class="game-footer">
+      <span><i class="mint-dot"></i><span data-en="Destroy enemies → Collect energy → Choose upgrades">击毁敌人 → 收集能量 → 选择强化</span></span>
+      <span data-en="P / ESC Pause">P / ESC 暂停</span>
+    </footer>
+  </div>
+  <div id="live-status" class="sr-only" aria-live="polite"></div>
+</body>
+</html>
